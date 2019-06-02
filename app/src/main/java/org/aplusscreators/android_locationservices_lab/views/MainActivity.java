@@ -16,7 +16,6 @@ import android.widget.Toast;
 
 import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
@@ -27,13 +26,15 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 
 import org.aplusscreators.android_locationservices_lab.R;
+import org.aplusscreators.android_locationservices_lab.utils.CustomLocationCallback;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = MainActivity.class.getSimpleName();
     private static final int REQUEST_CHECK_SETTINGS = 1131;
-    private final int LOCATION_PERMMISSION_REQUEST_CODE = 1121;
+    private final int LOCATION_PERMISSION_REQUEST_CODE = 1121;
     private FusedLocationProviderClient fusedLocationProviderClient;
+    private CustomLocationCallback locationCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,19 +42,22 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
+        locationCallback = new CustomLocationCallback(this);
 
         boolean permissionGranted = checkPermissionGrantedStatus();
 
         if (!permissionGranted) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_PERMMISSION_REQUEST_CODE);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
         } else {
             setUpLocationRequestTask();
         }
 
-        startLocationUpdates();
+        if (permissionGranted)
+            startLocationUpdates();
 
     }
 
+    @SuppressLint("MissingPermission")
     private void startLocationUpdates() {
         LocationRequest locationRequest = createLocationRequest();
         Task<LocationSettingsResponse> task = checkLocationSettings(locationRequest);
@@ -62,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSuccess(LocationSettingsResponse locationSettingsResponse) {
                 Log.w(TAG, "onSuccess: Ready for location updates");
+                fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, null);
             }
         }).addOnFailureListener(this, new OnFailureListener() {
             @Override
@@ -69,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
                 if (e instanceof ResolvableApiException) {
                     try {
                         ResolvableApiException resolvableApiException = (ResolvableApiException) e;
-                        resolvableApiException.startResolutionForResult(MainActivity.this,REQUEST_CHECK_SETTINGS);
+                        resolvableApiException.startResolutionForResult(MainActivity.this, REQUEST_CHECK_SETTINGS);
                     } catch (IntentSender.SendIntentException ex) {
                         ex.printStackTrace();
                     }
@@ -146,10 +151,11 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         switch (requestCode) {
-            case LOCATION_PERMMISSION_REQUEST_CODE:
+            case LOCATION_PERMISSION_REQUEST_CODE:
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Toast.makeText(getApplicationContext(), "Permission Granted", Toast.LENGTH_LONG).show();
                     setUpLocationRequestTask();
+                    startLocationUpdates();
                 } else
                     Toast.makeText(getApplicationContext(), "Permission Denied", Toast.LENGTH_LONG).show();
                 break;
